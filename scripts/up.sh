@@ -2,6 +2,7 @@
 # =============================================================================
 # drawbridge/scripts/up.sh
 # Orchestrator: bring up the entire Azure environment
+# Calls each create script in dependency order with error handling
 # =============================================================================
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -29,75 +30,75 @@ if [[ ! "$confirm" =~ ^[Yy]$ ]]; then
 fi
 
 SECONDS=0
+FAILED=0
 
-# --- Step 1: Network ---
-log_info "Step 1/7: Creating resource group, VNet, and subnets..."
-if [[ -f "$SCRIPT_DIR/create-network.sh" ]]; then
-    bash "$SCRIPT_DIR/create-network.sh"
-else
-    log_warn "create-network.sh not found — skipping (implement in issue #2)"
-fi
+# --- Helper: run a step, track failures ---
+run_step() {
+    local step_num="$1"
+    local total="$2"
+    local description="$3"
+    local script="$4"
 
-# --- Step 2: SQL ---
-log_info "Step 2/7: Creating Azure SQL server and database..."
-if [[ -f "$SCRIPT_DIR/create-sql.sh" ]]; then
-    bash "$SCRIPT_DIR/create-sql.sh"
-else
-    log_warn "create-sql.sh not found — skipping (implement in issue #5)"
-fi
+    echo ""
+    log_info "Step ${step_num}/${total}: ${description}"
 
-# --- Step 3: Storage + Key Vault ---
-log_info "Step 3/7: Creating Storage account and Key Vault..."
-if [[ -f "$SCRIPT_DIR/create-storage.sh" ]]; then
-    bash "$SCRIPT_DIR/create-storage.sh"
-else
-    log_warn "create-storage.sh not found — skipping (implement in issue #6)"
-fi
+    if [[ ! -f "$SCRIPT_DIR/$script" ]]; then
+        log_error "$script not found"
+        FAILED=$((FAILED + 1))
+        return 1
+    fi
 
-# --- Step 4: Private Endpoints ---
-log_info "Step 4/7: Creating private endpoints and DNS zones..."
-if [[ -f "$SCRIPT_DIR/create-private-endpoints.sh" ]]; then
-    bash "$SCRIPT_DIR/create-private-endpoints.sh"
-else
-    log_warn "create-private-endpoints.sh not found — skipping (implement in issue #7)"
-fi
+    if bash "$SCRIPT_DIR/$script"; then
+        log_success "Step ${step_num} complete"
+    else
+        log_error "Step ${step_num} failed: $script"
+        FAILED=$((FAILED + 1))
+        return 1
+    fi
+}
 
-# --- Step 5: App Service ---
-log_info "Step 5/7: Creating App Service..."
-if [[ -f "$SCRIPT_DIR/create-appservice.sh" ]]; then
-    bash "$SCRIPT_DIR/create-appservice.sh"
-else
-    log_warn "create-appservice.sh not found — skipping (implement in issue #4)"
-fi
+# --- Execute in dependency order ---
+TOTAL=7
 
-# --- Step 6: Monitoring ---
-log_info "Step 6/7: Creating Application Insights..."
-if [[ -f "$SCRIPT_DIR/create-monitoring.sh" ]]; then
-    bash "$SCRIPT_DIR/create-monitoring.sh"
-else
-    log_warn "create-monitoring.sh not found — skipping (implement in issue #8)"
-fi
-
-# --- Step 7: Tailscale ---
-log_info "Step 7/7: Creating Tailscale subnet router..."
-if [[ -f "$SCRIPT_DIR/create-tailscale.sh" ]]; then
-    bash "$SCRIPT_DIR/create-tailscale.sh"
-else
-    log_warn "create-tailscale.sh not found — skipping (implement in issue #3)"
-fi
+run_step 1 $TOTAL "Resource group, VNet, and subnets"   "create-network.sh"
+run_step 2 $TOTAL "Azure SQL server and database"        "create-sql.sh"
+run_step 3 $TOTAL "Storage account and Key Vault"        "create-storage.sh"
+run_step 4 $TOTAL "Private endpoints and DNS zones"      "create-private-endpoints.sh"
+run_step 5 $TOTAL "App Service with Entra ID auth"       "create-appservice.sh"
+run_step 6 $TOTAL "Application Insights"                 "create-monitoring.sh"
+run_step 7 $TOTAL "Tailscale subnet router"              "create-tailscale.sh"
 
 # --- Summary ---
 ELAPSED=$SECONDS
 echo ""
 echo "╔═══════════════════════════════════════════╗"
-echo "║       🏰 Drawbridge — Complete             ║"
+if [[ $FAILED -eq 0 ]]; then
+    echo "║       🏰 Drawbridge — Complete             ║"
+else
+    echo "║       🏰 Drawbridge — Partial ($FAILED failed)   ║"
+fi
 echo "╚═══════════════════════════════════════════╝"
 echo ""
-log_success "Environment created in $((ELAPSED / 60))m $((ELAPSED % 60))s"
+
+log_info "Time: $((ELAPSED / 60))m $((ELAPSED % 60))s"
+
+if [[ $FAILED -gt 0 ]]; then
+    log_warn "$FAILED step(s) failed. Review the output above and re-run 'make up' (idempotent)."
+fi
+
+echo ""
+log_info "Environment summary:"
+echo "  App URL:   https://${APP_NAME}.azurewebsites.net"
+echo "  SQL FQDN:  ${SQL_SERVER_NAME}.database.windows.net"
+echo "  Storage:   ${STORAGE_ACCOUNT_NAME}.blob.core.windows.net"
+echo "  Key Vault: ${KEYVAULT_NAME}.vault.azure.net"
 echo ""
 log_info "Next steps:"
-echo "  1. Install Tailscale on your Mac: https://tailscale.com/download"
-echo "  2. Approve the subnet router in Tailscale admin console"
-echo "  3. Visit your app: https://${APP_NAME}.azurewebsites.net"
-echo "  4. Deploy code: make deploy"
+echo "  1. Install Tailscale: https://tailscale.com/download"
+echo "  2. Approve subnet routes: https://login.tailscale.com/admin/machines"
+echo "  3. Test DNS: nslookup ${SQL_SERVER_NAME}.database.windows.net"
+echo "  4. Deploy app code: make deploy"
+echo "  5. Check status: make status"
 echo ""
+
+exit $FAILED
