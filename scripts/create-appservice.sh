@@ -10,7 +10,6 @@ source "$SCRIPT_DIR/config.sh"
 
 log_info "=== App Service Provisioning ==="
 
-# --- Prerequisites ---
 if ! check_prerequisites; then
     exit 1
 fi
@@ -26,14 +25,21 @@ if [[ -n "$EXISTING_ASP" ]]; then
     log_info "App Service Plan $ASP_NAME already exists — skipping"
 else
     log_info "Creating App Service Plan: $ASP_NAME (SKU: $ASP_SKU, Linux)"
-    az appservice plan create \
+
+    if ! az appservice plan create \
         --resource-group "$RESOURCE_GROUP" \
         --name "$ASP_NAME" \
         --sku "$ASP_SKU" \
         --is-linux \
         --location "$AZURE_LOCATION" \
         --tags $TAGS \
-        --output none
+        --output none; then
+
+        log_error "App Service Plan creation failed. Common causes:"
+        log_error "  - Quota limit: request a quota increase in Azure Portal"
+        log_error "  - Region capacity: try a different AZURE_LOCATION in .env"
+        exit 1
+    fi
 
     log_success "App Service Plan created: $ASP_NAME"
 fi
@@ -49,13 +55,18 @@ if [[ -n "$EXISTING_APP" ]]; then
     log_info "Web App $APP_NAME already exists — skipping creation"
 else
     log_info "Creating Web App: $APP_NAME (Python 3.12)"
-    az webapp create \
+
+    if ! az webapp create \
         --resource-group "$RESOURCE_GROUP" \
         --plan "$ASP_NAME" \
         --name "$APP_NAME" \
         --runtime "PYTHON:3.12" \
         --tags $TAGS \
-        --output none
+        --output none; then
+
+        log_error "Web App creation failed. The App Service Plan may not exist."
+        exit 1
+    fi
 
     log_success "Web App created: $APP_NAME"
 fi
@@ -68,15 +79,20 @@ MI_PRINCIPAL_ID=$(az webapp identity assign \
     --query "principalId" \
     --output tsv 2>/dev/null)
 
+if [[ -z "$MI_PRINCIPAL_ID" ]]; then
+    log_error "Failed to enable managed identity on $APP_NAME"
+    exit 1
+fi
+
 log_success "Managed Identity enabled (Principal ID: ${MI_PRINCIPAL_ID:0:8}...)"
 
 # --- Startup command for FastAPI ---
-log_info "Configuring startup command for FastAPI (gunicorn + uvicorn worker)..."
+log_info "Configuring startup command for FastAPI..."
 az webapp config set \
     --resource-group "$RESOURCE_GROUP" \
     --name "$APP_NAME" \
     --startup-file "gunicorn -k uvicorn.workers.UvicornWorker -b 0.0.0.0:8000 -w 2 --timeout 120 --access-logfile '-' --error-logfile '-' app.main:app" \
-    --output none
+    --output none || { log_error "Failed to set startup command"; exit 1; }
 
 log_success "Startup command configured"
 
@@ -89,27 +105,25 @@ az webapp config appsettings set \
         SCM_DO_BUILD_DURING_DEPLOYMENT=true \
         WEBSITE_HTTPLOGGING_RETENTION_DAYS=3 \
         PYTHONDONTWRITEBYTECODE=1 \
-    --output none
+    --output none || { log_error "Failed to set app settings"; exit 1; }
 
 log_success "App settings configured"
 
-# --- Always-on (available on B1+) ---
-log_info "Enabling always-on..."
+# --- Always-on + HTTPS only ---
+log_info "Enabling always-on and HTTPS-only..."
 az webapp config set \
     --resource-group "$RESOURCE_GROUP" \
     --name "$APP_NAME" \
     --always-on true \
     --output none 2>/dev/null
 
-# --- HTTPS only ---
-log_info "Enforcing HTTPS only..."
 az webapp update \
     --resource-group "$RESOURCE_GROUP" \
     --name "$APP_NAME" \
     --https-only true \
-    --output none
+    --output none || log_warn "Could not enforce HTTPS-only"
 
-# --- VNet integration (outbound to private backend) ---
+# --- VNet integration ---
 log_info "Configuring VNet integration with $SNET_APP_NAME..."
 
 EXISTING_VNET_INT=$(az webapp vnet-integration list \
@@ -121,28 +135,30 @@ EXISTING_VNET_INT=$(az webapp vnet-integration list \
 if [[ -n "$EXISTING_VNET_INT" ]]; then
     log_info "VNet integration already configured — skipping"
 else
-    az webapp vnet-integration add \
+    if ! az webapp vnet-integration add \
         --resource-group "$RESOURCE_GROUP" \
         --name "$APP_NAME" \
         --vnet "$VNET_NAME" \
         --subnet "$SNET_APP_NAME" \
-        --output none
+        --output none; then
+
+        log_error "VNet integration failed"
+        exit 1
+    fi
 
     log_success "VNet integration configured: $VNET_NAME/$SNET_APP_NAME"
 fi
 
-# Route all outbound traffic through VNet (required for private endpoint resolution)
-log_info "Enabling route-all for VNet integration..."
+# Route all outbound through VNet
 az webapp config appsettings set \
     --resource-group "$RESOURCE_GROUP" \
     --name "$APP_NAME" \
     --settings WEBSITE_VNET_ROUTE_ALL=1 \
-    --output none
+    --output none 2>/dev/null
 
 # --- Entra ID authentication (Easy Auth v2) ---
-log_info "Configuring Entra ID authentication (Easy Auth)..."
+log_info "Configuring Entra ID authentication..."
 
-# Check if an Entra app registration already exists for this web app
 ENTRA_APP_NAME="app-${PROJECT}-${ENV}-auth"
 EXISTING_ENTRA_APP=$(az ad app list \
     --display-name "$ENTRA_APP_NAME" \
@@ -153,7 +169,6 @@ if [[ -n "$EXISTING_ENTRA_APP" ]]; then
     ENTRA_CLIENT_ID="$EXISTING_ENTRA_APP"
     log_info "Entra app registration already exists: $ENTRA_CLIENT_ID"
 else
-    # Create Entra app registration
     APP_URL="https://${APP_NAME}.azurewebsites.net"
 
     ENTRA_CLIENT_ID=$(az ad app create \
@@ -164,17 +179,17 @@ else
         --query "appId" \
         --output tsv 2>/dev/null)
 
-    log_success "Entra app registration created: $ENTRA_CLIENT_ID"
+    if [[ -z "$ENTRA_CLIENT_ID" ]]; then
+        log_error "Failed to create Entra app registration"
+        exit 1
+    fi
 
-    # Create a service principal for the app registration
+    log_success "Entra app registration created: $ENTRA_CLIENT_ID"
     az ad sp create --id "$ENTRA_CLIENT_ID" --output none 2>/dev/null
     log_success "Service principal created"
 fi
 
-# Get tenant ID
 TENANT_ID=$(az account show --query "tenantId" --output tsv)
-
-# Configure Easy Auth v2 on the web app
 ISSUER_URL="https://login.microsoftonline.com/${TENANT_ID}/v2.0"
 
 az webapp auth update \
@@ -184,7 +199,6 @@ az webapp auth update \
     --action LoginWithAzureActiveDirectory \
     --output none 2>/dev/null
 
-# Configure the Microsoft identity provider
 az webapp auth microsoft update \
     --resource-group "$RESOURCE_GROUP" \
     --name "$APP_NAME" \
@@ -218,9 +232,4 @@ echo "  Managed ID:    ${MI_PRINCIPAL_ID:0:8}..."
 echo "  VNet:          $VNET_NAME/$SNET_APP_NAME"
 echo "  Auth:          Entra ID (Easy Auth v2)"
 echo "  Entra App:     $ENTRA_CLIENT_ID"
-echo ""
-log_info "Next steps:"
-echo "  1. Deploy app code:  make deploy"
-echo "  2. Stream logs:      make logs"
-echo "  3. Visit:            $APP_URL"
 echo ""

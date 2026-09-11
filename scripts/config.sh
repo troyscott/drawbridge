@@ -23,16 +23,6 @@ AZURE_SUBSCRIPTION_ID="${AZURE_SUBSCRIPTION_ID:-}"
 
 # --- Naming convention: {resource}-{project}-{env}-{region} ---
 # Short region codes for resource naming
-declare -A REGION_SHORT=(
-    [eastus]="eus"
-    [eastus2]="eus2"
-    [westus]="wus"
-    [westus2]="wus2"
-    [centralus]="cus"
-    [northeurope]="neu"
-    [westeurope]="weu"
-)
-REGION_CODE="${REGION_SHORT[$AZURE_LOCATION]:-$AZURE_LOCATION}"
 
 # --- Resource names ---
 RESOURCE_GROUP="rg-${PROJECT}-${ENV}-${AZURE_LOCATION}"
@@ -161,4 +151,17 @@ print_config() {
     echo "  Tailscale VM:   $TS_VM_NAME ($TS_VM_SIZE)"
     echo "  App Insights:   $APPINSIGHTS_NAME"
     echo ""
+}
+
+# Run an az command and exit on failure
+run_az() {
+    local description="$1"
+    shift
+    if "$@"; then
+        return 0
+    else
+        log_error "Failed: $description"
+        log_error "Command: $*"
+        return 1
+    fi
 }
