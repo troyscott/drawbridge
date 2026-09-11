@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # =============================================================================
-# drawbridge/scripts/delete-monitoring.sh
+# drawbridge/cookbooks/dmz-app-sql/delete-monitoring.sh
 # Remove Application Insights and Log Analytics workspace
 # =============================================================================
 

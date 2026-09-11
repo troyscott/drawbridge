@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # =============================================================================
-# drawbridge/scripts/delete-private-endpoints.sh
+# drawbridge/cookbooks/dmz-app-sql/delete-private-endpoints.sh
 # Remove private endpoints, DNS zone groups, DNS zones, and VNet links
 # =============================================================================
 

@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # =============================================================================
-# drawbridge/scripts/create-monitoring.sh
+# drawbridge/cookbooks/dmz-app-sql/create-monitoring.sh
 # Create Log Analytics workspace and Application Insights
 # Idempotent — safe to re-run
 # =============================================================================

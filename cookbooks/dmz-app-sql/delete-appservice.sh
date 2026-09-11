@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # =============================================================================
-# drawbridge/scripts/delete-appservice.sh
+# drawbridge/cookbooks/dmz-app-sql/delete-appservice.sh
 # Remove App Service, App Service Plan, and Entra app registration
 # =============================================================================
 

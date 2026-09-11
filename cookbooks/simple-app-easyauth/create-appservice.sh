@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # =============================================================================
-# drawbridge/scripts/create-appservice.sh
-# Create App Service Plan, Web App, VNet integration, and Entra ID auth
-# Idempotent — safe to re-run
+# drawbridge/cookbooks/simple-app-easyauth/create-appservice.sh
+# Create the resource group, App Service Plan, Web App, and Entra ID auth.
+# No VNet, no private backend. Idempotent — safe to re-run.
 # =============================================================================
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -12,6 +12,20 @@ log_info "=== App Service Provisioning ==="
 
 if ! check_prerequisites; then
     exit 1
+fi
+
+# --- Resource Group ---
+if resource_group_exists; then
+    log_info "Resource group $RESOURCE_GROUP already exists — skipping"
+else
+    log_info "Creating resource group: $RESOURCE_GROUP"
+    az group create \
+        --name "$RESOURCE_GROUP" \
+        --location "$AZURE_LOCATION" \
+        --tags $TAGS \
+        --output none
+
+    log_success "Resource group created: $RESOURCE_GROUP"
 fi
 
 # --- App Service Plan ---
@@ -86,16 +100,6 @@ fi
 
 log_success "Managed Identity enabled (Principal ID: ${MI_PRINCIPAL_ID:0:8}...)"
 
-# --- Startup command for FastAPI ---
-log_info "Configuring startup command for FastAPI..."
-az webapp config set \
-    --resource-group "$RESOURCE_GROUP" \
-    --name "$APP_NAME" \
-    --startup-file "gunicorn -k uvicorn.workers.UvicornWorker -b 0.0.0.0:8000 -w 2 --timeout 120 --access-logfile '-' --error-logfile '-' app.main:app" \
-    --output none || { log_error "Failed to set startup command"; exit 1; }
-
-log_success "Startup command configured"
-
 # --- App settings ---
 log_info "Configuring app settings..."
 az webapp config appsettings set \
@@ -122,39 +126,6 @@ az webapp update \
     --name "$APP_NAME" \
     --https-only true \
     --output none || log_warn "Could not enforce HTTPS-only"
-
-# --- VNet integration ---
-log_info "Configuring VNet integration with $SNET_APP_NAME..."
-
-EXISTING_VNET_INT=$(az webapp vnet-integration list \
-    --resource-group "$RESOURCE_GROUP" \
-    --name "$APP_NAME" \
-    --query "[0].name" \
-    --output tsv 2>/dev/null)
-
-if [[ -n "$EXISTING_VNET_INT" ]]; then
-    log_info "VNet integration already configured — skipping"
-else
-    if ! az webapp vnet-integration add \
-        --resource-group "$RESOURCE_GROUP" \
-        --name "$APP_NAME" \
-        --vnet "$VNET_NAME" \
-        --subnet "$SNET_APP_NAME" \
-        --output none; then
-
-        log_error "VNet integration failed"
-        exit 1
-    fi
-
-    log_success "VNet integration configured: $VNET_NAME/$SNET_APP_NAME"
-fi
-
-# Route all outbound through VNet
-az webapp config appsettings set \
-    --resource-group "$RESOURCE_GROUP" \
-    --name "$APP_NAME" \
-    --settings WEBSITE_VNET_ROUTE_ALL=1 \
-    --output none 2>/dev/null
 
 # --- Entra ID authentication (Easy Auth v2) ---
 log_info "Configuring Entra ID authentication..."
@@ -229,7 +200,8 @@ echo "  Web App:       $APP_NAME"
 echo "  URL:           $APP_URL"
 echo "  Runtime:       Python 3.12"
 echo "  Managed ID:    ${MI_PRINCIPAL_ID:0:8}..."
-echo "  VNet:          $VNET_NAME/$SNET_APP_NAME"
 echo "  Auth:          Entra ID (Easy Auth v2)"
 echo "  Entra App:     $ENTRA_CLIENT_ID"
+echo ""
+log_info "Visit the URL above — you'll be redirected to sign in with Entra ID."
 echo ""

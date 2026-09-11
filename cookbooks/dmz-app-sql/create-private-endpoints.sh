@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # =============================================================================
-# drawbridge/scripts/create-private-endpoints.sh
+# drawbridge/cookbooks/dmz-app-sql/create-private-endpoints.sh
 # Create private endpoints + DNS zones for SQL, Storage, and Key Vault
 # Idempotent — safe to re-run
 # =============================================================================

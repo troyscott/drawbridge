@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # =============================================================================
-# drawbridge/scripts/create-tailscale.sh
+# drawbridge/cookbooks/dmz-app-sql/create-tailscale.sh
 # Deploy a lightweight Linux VM as a Tailscale subnet router
 # Idempotent — safe to re-run
 # =============================================================================

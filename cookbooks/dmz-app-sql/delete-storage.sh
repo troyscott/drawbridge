@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # =============================================================================
-# drawbridge/scripts/delete-storage.sh
+# drawbridge/cookbooks/dmz-app-sql/delete-storage.sh
 # Remove Storage account and Key Vault
 # =============================================================================
 

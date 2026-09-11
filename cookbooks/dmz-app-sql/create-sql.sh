@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # =============================================================================
-# drawbridge/scripts/create-sql.sh
+# drawbridge/cookbooks/dmz-app-sql/create-sql.sh
 # Create Azure SQL logical server (Entra-only) and serverless database
 # Idempotent — safe to re-run
 # =============================================================================
