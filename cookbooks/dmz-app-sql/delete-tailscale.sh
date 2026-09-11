@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # =============================================================================
-# drawbridge/scripts/delete-tailscale.sh
+# drawbridge/cookbooks/dmz-app-sql/delete-tailscale.sh
 # Remove Tailscale subnet router VM and associated resources
 # =============================================================================
 

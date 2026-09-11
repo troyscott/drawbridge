@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # =============================================================================
-# drawbridge/scripts/status.sh
+# drawbridge/cookbooks/dmz-app-sql/status.sh
 # Show status of all Azure resources
 # =============================================================================
 
@@ -9,7 +9,7 @@ source "$SCRIPT_DIR/config.sh"
 
 echo ""
 echo "╔═══════════════════════════════════════════╗"
-echo "║       🏰 Drawbridge — Status               ║"
+echo "║       🏰 dmz-app-sql — Status               ║"
 echo "╚═══════════════════════════════════════════╝"
 echo ""
 

@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # =============================================================================
-# drawbridge/scripts/up.sh
+# drawbridge/cookbooks/dmz-app-sql/up.sh
 # Orchestrator: bring up the entire Azure environment
 # Calls each create script in dependency order with error handling
 # =============================================================================
@@ -10,13 +10,13 @@ source "$SCRIPT_DIR/config.sh"
 
 echo ""
 echo "╔═══════════════════════════════════════════╗"
-echo "║       🏰 Drawbridge — Bring Up            ║"
+echo "║   🏰 dmz-app-sql — Bring Up               ║"
 echo "╚═══════════════════════════════════════════╝"
 echo ""
 
 # --- Validate prerequisites ---
 if ! check_prerequisites; then
-    log_error "Prerequisites check failed. Run 'make validate' for details."
+    log_error "Prerequisites check failed. Run 'make validate COOKBOOK=dmz-app-sql' for details."
     exit 1
 fi
 
@@ -73,9 +73,9 @@ ELAPSED=$SECONDS
 echo ""
 echo "╔═══════════════════════════════════════════╗"
 if [[ $FAILED -eq 0 ]]; then
-    echo "║       🏰 Drawbridge — Complete             ║"
+    echo "║       🏰 dmz-app-sql — Complete             ║"
 else
-    echo "║       🏰 Drawbridge — Partial ($FAILED failed)   ║"
+    echo "║       🏰 dmz-app-sql — Partial ($FAILED failed)   ║"
 fi
 echo "╚═══════════════════════════════════════════╝"
 echo ""
@@ -83,7 +83,7 @@ echo ""
 log_info "Time: $((ELAPSED / 60))m $((ELAPSED % 60))s"
 
 if [[ $FAILED -gt 0 ]]; then
-    log_warn "$FAILED step(s) failed. Review the output above and re-run 'make up' (idempotent)."
+    log_warn "$FAILED step(s) failed. Review the output above and re-run 'make up COOKBOOK=dmz-app-sql' (idempotent)."
 fi
 
 echo ""
@@ -97,8 +97,8 @@ log_info "Next steps:"
 echo "  1. Install Tailscale: https://tailscale.com/download"
 echo "  2. Approve subnet routes: https://login.tailscale.com/admin/machines"
 echo "  3. Test DNS: nslookup ${SQL_SERVER_NAME}.database.windows.net"
-echo "  4. Deploy app code: make deploy"
-echo "  5. Check status: make status"
+echo "  4. Deploy app code: make deploy COOKBOOK=dmz-app-sql"
+echo "  5. Check status: make status COOKBOOK=dmz-app-sql"
 echo ""
 
 exit $FAILED

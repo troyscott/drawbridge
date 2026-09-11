@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # =============================================================================
-# drawbridge/scripts/create-storage.sh
+# drawbridge/cookbooks/dmz-app-sql/create-storage.sh
 # Create Storage account (Blob, private) and Key Vault (RBAC, private)
 # Idempotent — safe to re-run
 # =============================================================================

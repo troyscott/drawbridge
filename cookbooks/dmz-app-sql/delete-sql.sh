@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # =============================================================================
-# drawbridge/scripts/delete-sql.sh
+# drawbridge/cookbooks/dmz-app-sql/delete-sql.sh
 # Remove Azure SQL database and logical server
 # =============================================================================
 

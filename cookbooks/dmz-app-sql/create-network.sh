@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # =============================================================================
-# drawbridge/scripts/create-network.sh
+# drawbridge/cookbooks/dmz-app-sql/create-network.sh
 # Create Resource Group, VNet, and subnets
 # Idempotent — safe to re-run
 # =============================================================================

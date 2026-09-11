@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # =============================================================================
-# drawbridge/scripts/down.sh
+# drawbridge/cookbooks/dmz-app-sql/down.sh
 # Orchestrator: tear down the entire Azure environment
 # Deletes the resource group (removes all resources) + Entra app + KV purge
 # =============================================================================
@@ -10,7 +10,7 @@ source "$SCRIPT_DIR/config.sh"
 
 echo ""
 echo "╔═══════════════════════════════════════════╗"
-echo "║       🏰 Drawbridge — Tear Down            ║"
+echo "║       🏰 dmz-app-sql — Tear Down            ║"
 echo "╚═══════════════════════════════════════════╝"
 echo ""
 
@@ -82,7 +82,7 @@ fi
 ELAPSED=$SECONDS
 echo ""
 echo "╔═══════════════════════════════════════════╗"
-echo "║       🏰 Drawbridge — Teardown Initiated   ║"
+echo "║       🏰 dmz-app-sql — Teardown Initiated   ║"
 echo "╚═══════════════════════════════════════════╝"
 echo ""
 log_info "Time: $((ELAPSED / 60))m $((ELAPSED % 60))s"

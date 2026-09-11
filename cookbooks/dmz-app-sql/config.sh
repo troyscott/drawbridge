@@ -1,40 +1,32 @@
 #!/usr/bin/env bash
 # =============================================================================
-# drawbridge/scripts/config.sh
-# Central configuration sourced by all infrastructure scripts.
+# drawbridge/cookbooks/dmz-app-sql/config.sh
+# Config for the "dmz-app-sql" cookbook: public App Service (VNet-integrated,
+# Entra Easy Auth) with SQL/Storage/Key Vault behind private endpoints and a
+# Tailscale subnet router for private dev access.
 # =============================================================================
 
-# --- Load .env if present (secrets, overrides) ---
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
+PROJECT_ROOT="$(dirname "$(dirname "$SCRIPT_DIR")")"
+source "$PROJECT_ROOT/lib/common.sh"
 
+# --- Load .env if present (secrets, shared overrides) ---
 if [[ -f "$PROJECT_ROOT/.env" ]]; then
     # shellcheck source=/dev/null
     source "$PROJECT_ROOT/.env"
 fi
 
-# --- Project defaults (override via .env) ---
-PROJECT="${PROJECT:-drawbridge}"
+# --- Project defaults ---
+# PROJECT is fixed per cookbook (not overridable via the shared .env) so two
+# cookbooks never collide on the same resource names when both are deployed.
+PROJECT="drawbridge-dmz"
 ENV="${ENV:-dev}"
 AZURE_LOCATION="${AZURE_LOCATION:-eastus2}"
 
 # --- Azure subscription ---
 AZURE_SUBSCRIPTION_ID="${AZURE_SUBSCRIPTION_ID:-}"
 
-# --- Naming convention: {resource}-{project}-{env}-{region} ---
-# Short region codes for resource naming
-declare -A REGION_SHORT=(
-    [eastus]="eus"
-    [eastus2]="eus2"
-    [westus]="wus"
-    [westus2]="wus2"
-    [centralus]="cus"
-    [northeurope]="neu"
-    [westeurope]="weu"
-)
-REGION_CODE="${REGION_SHORT[$AZURE_LOCATION]:-$AZURE_LOCATION}"
-
-# --- Resource names ---
+# --- Resource names: {resource}-{project}-{env} ---
 RESOURCE_GROUP="rg-${PROJECT}-${ENV}-${AZURE_LOCATION}"
 VNET_NAME="vnet-${PROJECT}-${ENV}"
 VNET_CIDR="10.50.0.0/24"
@@ -60,7 +52,7 @@ SQL_DB_AUTOPAUSE="${SQL_DB_AUTOPAUSE:-60}"     # minutes
 
 # Storage
 RANDOM_SUFFIX="${RANDOM_SUFFIX:-$(echo "$AZURE_SUBSCRIPTION_ID" | md5sum 2>/dev/null | cut -c1-6 || echo "000000")}"
-STORAGE_ACCOUNT_NAME="st${PROJECT}${ENV}${RANDOM_SUFFIX}"
+STORAGE_ACCOUNT_NAME="st${PROJECT//-/}${ENV}${RANDOM_SUFFIX}"
 STORAGE_SKU="${STORAGE_SKU:-Standard_LRS}"
 
 # Key Vault
@@ -84,68 +76,12 @@ TS_VM_IMAGE="${TS_VM_IMAGE:-Canonical:ubuntu-24_04-lts:server:latest}"
 TS_AUTHKEY="${TS_AUTHKEY:-}"
 
 # --- Tags applied to all resources ---
-TAGS="project=${PROJECT} environment=${ENV} managedBy=drawbridge"
-
-# =============================================================================
-# Helper functions
-# =============================================================================
-
-log_info() {
-    echo -e "\033[0;34m[INFO]\033[0m $*"
-}
-
-log_success() {
-    echo -e "\033[0;32m[OK]\033[0m $*"
-}
-
-log_warn() {
-    echo -e "\033[0;33m[WARN]\033[0m $*"
-}
-
-log_error() {
-    echo -e "\033[0;31m[ERROR]\033[0m $*" >&2
-}
-
-# Check that required CLI tools are available
-check_prerequisites() {
-    local missing=0
-    for cmd in az jq; do
-        if ! command -v "$cmd" &>/dev/null; then
-            log_error "Required command not found: $cmd"
-            missing=1
-        fi
-    done
-
-    if [[ -z "$AZURE_SUBSCRIPTION_ID" ]]; then
-        log_error "AZURE_SUBSCRIPTION_ID is not set. Add it to .env or export it."
-        missing=1
-    fi
-
-    # Verify az login
-    if ! az account show &>/dev/null; then
-        log_error "Not logged in to Azure. Run: az login"
-        missing=1
-    fi
-
-    if [[ $missing -eq 1 ]]; then
-        return 1
-    fi
-
-    # Set subscription
-    az account set --subscription "$AZURE_SUBSCRIPTION_ID" 2>/dev/null
-    log_success "Using subscription: $(az account show --query name -o tsv)"
-    return 0
-}
-
-# Check if a resource group exists
-resource_group_exists() {
-    az group exists --name "$RESOURCE_GROUP" 2>/dev/null | grep -q "true"
-}
+TAGS="project=${PROJECT} environment=${ENV} managedBy=drawbridge cookbook=dmz-app-sql"
 
 # Print a summary of all configured resource names
 print_config() {
     echo ""
-    log_info "=== Drawbridge Configuration ==="
+    log_info "=== dmz-app-sql Configuration ==="
     echo "  Project:        $PROJECT"
     echo "  Environment:    $ENV"
     echo "  Location:       $AZURE_LOCATION"

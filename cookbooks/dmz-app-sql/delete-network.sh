@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # =============================================================================
-# drawbridge/scripts/delete-network.sh
+# drawbridge/cookbooks/dmz-app-sql/delete-network.sh
 # Delete VNet, subnets, and (optionally) the resource group
 # =============================================================================
 
