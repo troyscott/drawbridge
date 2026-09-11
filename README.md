@@ -110,7 +110,7 @@ drawbridge/
 │       ├── config.sh
 │       ├── up.sh / down.sh / status.sh
 │       └── create-appservice.sh / delete-appservice.sh
-├── app/                            # FastAPI + HTMX application (future — v0.2.0)
+├── app/                            # FastAPI + HTMX application (planned for v0.3.0 — not yet built)
 ├── docs/                           # Architecture docs and runbooks
 ├── .env.template                   # Shared environment config template
 ├── Makefile                        # Cookbook-aware developer targets
@@ -131,7 +131,7 @@ make config COOKBOOK=<name>          Print resolved configuration
 make up COOKBOOK=<name>              Bring up a cookbook's environment
 make down COOKBOOK=<name>            Tear down a cookbook's environment
 make status COOKBOOK=<name>          Show resource status
-make deploy COOKBOOK=<name>          Deploy application code
+make deploy COOKBOOK=<name>          Deploy application code (not yet implemented — no deploy-app.sh ships yet)
 make logs COOKBOOK=<name>            Stream App Service logs
 ```
 
